@@ -1,0 +1,15 @@
+{
+  "name": "oraculo-dark-academia",
+  "version": "1.0.0",
+  "description": "API Backend para mensajes de bienvenida",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
