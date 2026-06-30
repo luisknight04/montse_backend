@@ -32,7 +32,12 @@ app.get('/api/bienvenida', async (req, res) => {
         });
         const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
         const daysLeft = Math.ceil((new Date("2026-10-28") - new Date()) / (1000 * 60 * 60 * 24));
-        const prompt = `Hoy es ${today}. Faltan ${daysLeft} días para nuestro aniversario. Actúa como un narrador melancólico y confidente secreto de una novela romántica pasional y gótica. Genera un mensaje de bienvenida de máximo 25 palabras para mi novia. No uses su nombre; dirígete a ella usando obligatoriamente solo uno de estos apodos: Mi amor, Mi vida, Mi reina, Flaca, Princesa o Corazón. Tono: Intelectual, poético, misterioso y coquetamente romántico. Si faltan pocos días, muestra emoción contenida. No menciones que eres una IA.`;
+        const prompt = `Hoy es ${today}. Faltan ${daysLeft} días para nuestro aniversario. 
+Actúa como un narrador melancólico y confidente secreto de una novela romántica pasional y gótica.
+Genera un mensaje de bienvenida de máximo 50 palabras para mi novia. 
+No uses su nombre; dirígete a ella usando obligatoriamente solo uno de estos apodos: Mi amor, Mi vida, Mi reina, Flaca, Princesa o Corazón.
+Tono: Intelectual, poético, misterioso y coquetamente romántico.
+Si faltan pocos días, muestra emoción contenida. No menciones que eres una IA.`;
         
         const result = await model.generateContent(prompt);
         res.json({ mensaje: result.response.text() });
