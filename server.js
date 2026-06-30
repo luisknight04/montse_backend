@@ -27,8 +27,8 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 app.get('/api/bienvenida', async (req, res) => {
     try {
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
-            generationConfig: { maxOutputTokens: 40, temperature: 0.85 }
+            model: "gemini-3.1-flash-lite",
+            generationConfig: { temperature: 0.85 }
         });
         const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
         const daysLeft = Math.ceil((new Date("2026-10-28") - new Date()) / (1000 * 60 * 60 * 24));
