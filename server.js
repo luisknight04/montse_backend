@@ -97,10 +97,29 @@ app.post('/api/visita', async (req, res) => {
 });
 
 // =========================================================
-// 6. API: GENERADOR DEL QUIZ DIARIO DE SINTONÍA (NUEVO)
+// 6. API: GENERADOR DEL QUIZ DIARIO DE SINTONÍA (OPTIMIZADO)
 // =========================================================
 app.get('/api/quiz-diario', async (req, res) => {
     try {
+        // 1. Obtener la fecha de hoy local (Formato: YYYY-MM-DD)
+        const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+        const localISODate = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+
+        // 2. Buscar el progreso del usuario
+        let userProgress = await Progress.findOne({ userId: 'montse_0710' });
+        if (!userProgress) userProgress = await Progress.create({ userId: 'montse_0710' });
+
+        // 3. CONTROL DE BLOQUEO: ¿Ya jugó hoy?
+        if (userProgress.dailyQuiz && userProgress.dailyQuiz.lastPlayed === localISODate) {
+            return res.json({
+                alreadyPlayed: true,
+                categoria: userProgress.dailyQuiz.categoriaHoy || "Complicidad",
+                pregunta: "¡Ya respondiste el dilema de hoy! Vuelve mañana para un nuevo desafío.",
+                opciones: []
+            });
+        }
+
+        // 4. Si es un día nuevo, elegir categoría al azar
         const categorias = ["Romántica", "Divertida / Cómplice", "Erótica / Atrevida"];
         const indiceAleatorio = Math.floor(Math.random() * categorias.length);
         const categoriaDelDia = categorias[indiceAleatorio];
@@ -113,9 +132,11 @@ app.get('/api/quiz-diario', async (req, res) => {
             }
         });
 
-        const prompt = `Actúa como el narrador confidente e intelectual de una novela gótica y pasional.
+        // TONO CORREGIDO: Menos gótico pesado, más divertido, ingenioso y audaz
+        const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven. 
+        Evita sonar trágico, excesivamente poético o antiguo. Queremos frescura, juego y misterio moderno.
         Genera una pregunta de opción múltiple para mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
-        La pregunta debe plantear un escenario hipotético, coqueto o cómplice sobre nuestra relación.
+        La pregunta debe plantear un escenario hipotético, ingenioso o coqueto sobre nuestra relación.
         
         Debes devolver un objeto JSON con la siguiente estructura exacta:
         {
@@ -124,12 +145,15 @@ app.get('/api/quiz-diario', async (req, res) => {
           "opciones": ["Opción A", "Opción B", "Opción C"]
         }
         
-        Reglas estrictas: No uses nombres propios (usa Mi Amor, Mi Vida, Corazón). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
+        Reglas estrictas: Las opciones deben ser divertidas, ocurrentes o provocativas. No uses nombres propios (usa Mi Amor, Corazón, Mi Vida). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
 
         const result = await model.generateContent(prompt);
         const dataQuiz = JSON.parse(result.response.text());
 
-        res.json(dataQuiz);
+        res.json({
+            alreadyPlayed: false,
+            ...dataQuiz
+        });
 
     } catch (error) {
         console.error("Error al generar el Quiz del día:", error);
