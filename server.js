@@ -144,25 +144,20 @@ app.get('/api/quiz-diario', async (req, res) => {
         
         Reglas estrictas: Las opciones deben ser divertidas, ocurrentes o provocativas. No uses nombres propios (usa Mi Amor, Corazón, Mi Vida). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
 
-        const result = await model.generateContent(prompt);
-let respuestaTexto = result.response.text().trim();
+const result = await model.generateContent(prompt);
+        const respuestaTexto = result.response.text().trim();
 
-// Limpieza de emergencia por si Gemini mete bloques de código Markdown
-if (respuestaTexto.startsWith("```json")) {
-    respuestaTexto = respuestaTexto.replace(/^```json/, "").replace(/```$/, "").trim();
-} else if (respuestaTexto.startsWith("```")) {
-    respuestaTexto = respuestaTexto.replace(/^```/, "").replace(/```$/, "").trim();
-}
+        // EXTRACCIÓN INFALIBLE CON REGEX:
+        // Busca todo lo que esté atrapado entre las llaves { ... } incluyendo saltos de línea
+        const jsonMatch = respuestaTexto.match(/\{[\s\S]*\}/);
 
-// Si metió texto conversacional antes del JSON, buscamos dónde abre realmente el objeto
-const inicioJSON = respuestaTexto.indexOf('{');
-const finJSON = respuestaTexto.lastIndexOf('}');
+        if (!jsonMatch) {
+            console.error("Texto crudo recibido de Gemini:", respuestaTexto);
+            throw new SyntaxError("No se encontró una estructura JSON válida en la respuesta de la IA.");
+        }
 
-if (inicioJSON !== -1 && finJSON !== -1) {
-    respuestaTexto = respuestaTexto.substring(inicioJSON, finJSON + 1);
-}
-
-const dataQuiz = JSON.parse(respuestaTexto); // Ahora sí se parsea de forma segura
+        // jsonMatch[0] contiene estrictamente el objeto JSON limpio sin texto conversacional ni "Here is the..."
+        const dataQuiz = JSON.parse(jsonMatch[0]);
 
         res.json({ alreadyPlayed: false, ...dataQuiz });
 
