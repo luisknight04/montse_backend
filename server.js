@@ -97,91 +97,78 @@ app.post('/api/visita', async (req, res) => {
 });
 
 // =========================================================
-// 6. API: GENERADOR DEL QUIZ DIARIO DE SINTONÍA (OPTIMIZADO)
+// 6. OBTENER QUIZ DIARIO (Actualizado para devolver su respuesta guardada)
 // =========================================================
 app.get('/api/quiz-diario', async (req, res) => {
     try {
-        // 1. Obtener la fecha de hoy local (Formato: YYYY-MM-DD)
         const tzOffset = (new Date()).getTimezoneOffset() * 60000;
         const localISODate = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
 
-        // 2. Buscar el progreso del usuario
         let userProgress = await Progress.findOne({ userId: 'montse_0710' });
         if (!userProgress) userProgress = await Progress.create({ userId: 'montse_0710' });
 
-        // 3. CONTROL DE BLOQUEO: ¿Ya jugó hoy?
+        // SI YA JUGÓ: Le regresamos la pregunta y la respuesta que guardó en la BD
         if (userProgress.dailyQuiz && userProgress.dailyQuiz.lastPlayed === localISODate) {
             return res.json({
                 alreadyPlayed: true,
                 categoria: userProgress.dailyQuiz.categoriaHoy || "Complicidad",
-                pregunta: "¡Ya respondiste el dilema de hoy! Vuelve mañana para un nuevo desafío.",
-                opciones: []
+                pregunta: userProgress.dailyQuiz.preguntaHoy || "¡Ya respondiste el dilema de hoy!",
+                respuestaElegida: userProgress.dailyQuiz.respuestaHoy || ""
             });
         }
 
-        // 4. Si es un día nuevo, elegir categoría al azar
+        // SI ES DÍA NUEVO: Todo igual...
         const categorias = ["Romántica", "Divertida / Cómplice", "Erótica / Atrevida"];
         const indiceAleatorio = Math.floor(Math.random() * categorias.length);
         const categoriaDelDia = categorias[indiceAleatorio];
 
         const model = genAI.getGenerativeModel({ 
             model: "gemini-3.1-flash-lite",
-            generationConfig: { 
-                temperature: 0.85,
-                responseMimeType: "application/json" 
-            }
+            generationConfig: { temperature: 0.85, responseMimeType: "application/json" }
         });
 
-        // TONO CORREGIDO: Menos gótico pesado, más divertido, ingenioso y audaz
-        const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven. 
-        Evita sonar trágico, excesivamente poético o antiguo. Queremos frescura, juego y misterio moderno.
+        const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven.
         Genera una pregunta de opción múltiple para mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
-        La pregunta debe plantear un escenario hipotético, ingenioso o coqueto sobre nuestra relación.
-        
-        Debes devolver un objeto JSON con la siguiente estructura exacta:
+        Devuelve un objeto JSON con esta estructura exacta:
         {
           "categoria": "${categoriaDelDia}",
           "pregunta": "Texto de la pregunta aquí",
           "opciones": ["Opción A", "Opción B", "Opción C"]
-        }
-        
-        Reglas estrictas: Las opciones deben ser divertidas, ocurrentes o provocativas. No uses nombres propios (usa Mi Amor, Corazón, Mi Vida). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
+        }`;
 
         const result = await model.generateContent(prompt);
         const dataQuiz = JSON.parse(result.response.text());
 
-        res.json({
-            alreadyPlayed: false,
-            ...dataQuiz
-        });
+        res.json({ alreadyPlayed: false, ...dataQuiz });
 
     } catch (error) {
-        console.error("Error al generar el Quiz del día:", error);
-        res.status(500).json({ error: 'El destino se ha nublado momentáneamente.' });
+        res.status(500).json({ error: 'El destino se ha nublado.' });
     }
 });
 
-// Endpoint para salvar que el quiz de hoy ya fue respondido
+// COMPLETAR QUIZ (Actualizado para almacenar la pregunta y la respuesta)
 app.post('/api/quiz-completar', async (req, res) => {
     try {
         const tzOffset = (new Date()).getTimezoneOffset() * 60000;
         const localISODate = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
-        const { categoria } = req.body;
+        const { categoria, pregunta, respuesta } = req.body; // <-- Recibimos los datos completos
 
         const data = await Progress.findOneAndUpdate(
             { userId: 'montse_0710' },
             { 
                 $set: { 
                     "dailyQuiz.lastPlayed": localISODate,
-                    "dailyQuiz.categoriaHoy": categoria
+                    "dailyQuiz.categoriaHoy": categoria,
+                    "dailyQuiz.preguntaHoy": pregunta,   // <-- Guardamos la pregunta generada
+                    "dailyQuiz.respuestaHoy": respuesta  // <-- Guardamos la respuesta elegida
                 },
-                $inc: { "dailyQuiz.currentStreak": 1 } // Suma 1 a su racha de días jugando
+                $inc: { "dailyQuiz.currentStreak": 1 }
             }, 
             { new: true, upsert: true }
         );
-        res.json({ success: true, racha: data.dailyQuiz.currentStreak });
+        res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: 'Error al salvar respuesta del quiz' });
+        res.status(500).json({ error: 'Error al salvar respuesta' });
     }
 });
 
