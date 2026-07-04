@@ -17,11 +17,17 @@ mongoose.connect(process.env.MONGODB_URI)
 const progressSchema = new mongoose.Schema({
     userId: { type: String, default: 'montse_0710', unique: true }, // Identificador único
     openedWeeks: { type: [Number], default: [] }, // Arreglo de semanas abiertas [1, 2, 3]
-    wonPrizes: { type: Object, default: {} } // Objeto con los premios { "1": "Masaje", "3": "Café" }
+    wonPrizes: { type: Object, default: {} }, // Objeto con los premios { "1": "Masaje", "3": "Café" }
+    loginCount: { type: Number, default: 0 }, // <-- NUEVO: Contador total de visitas
+    dailyQuiz: {                              // <-- NUEVO: Control del Quiz Diario
+        lastPlayed: { type: String, default: "" },
+        currentStreak: { type: Number, default: 0 },
+        categoriaHoy: { type: String, default: "" }
+    }
 });
 const Progress = mongoose.model('Progress', progressSchema);
 
-// 3. API DE GEMINI (Tu código intacto)
+// 3. API DE GEMINI (bienvenida)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 app.get('/api/bienvenida', async (req, res) => {
@@ -73,6 +79,67 @@ app.post('/api/sync', async (req, res) => {
         res.status(500).json({ error: 'Error guardando progreso' });
     }
 });
+
+// =========================================================
+// 5. API PARA REGISTRAR VISITAS (NUEVO)
+// =========================================================
+app.post('/api/visita', async (req, res) => {
+    try {
+        const data = await Progress.findOneAndUpdate(
+            { userId: 'montse_0710' },
+            { $inc: { loginCount: 1 } }, 
+            { new: true, upsert: true }
+        );
+        res.json({ success: true, totalVisitas: data.loginCount });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al registrar la visita' });
+    }
+});
+
+// =========================================================
+// 6. API: GENERADOR DEL QUIZ DIARIO DE SINTONÍA (NUEVO)
+// =========================================================
+app.get('/api/quiz-diario', async (req, res) => {
+    try {
+        const categorias = ["Romántica", "Divertida / Cómplice", "Erótica / Atrevida"];
+        const indiceAleatorio = Math.floor(Math.random() * categorias.length);
+        const categoriaDelDia = categorias[indiceAleatorio];
+
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-3.1-flash-lite",
+            generationConfig: { 
+                temperature: 0.85,
+                responseMimeType: "application/json" 
+            }
+        });
+
+        const prompt = `Actúa como el narrador confidente e intelectual de una novela gótica y pasional.
+        Genera una pregunta de opción múltiple para mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
+        La pregunta debe plantear un escenario hipotético, coqueto o cómplice sobre nuestra relación.
+        
+        Debes devolver un objeto JSON con la siguiente estructura exacta:
+        {
+          "categoria": "${categoriaDelDia}",
+          "pregunta": "Texto de la pregunta aquí",
+          "opciones": ["Opción A", "Opción B", "Opción C"]
+        }
+        
+        Reglas estrictas: No uses nombres propios (usa Mi Amor, Mi Vida, Corazón). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
+
+        const result = await model.generateContent(prompt);
+        const dataQuiz = JSON.parse(result.response.text());
+
+        res.json(dataQuiz);
+
+    } catch (error) {
+        console.error("Error al generar el Quiz del día:", error);
+        res.status(500).json({ error: 'El destino se ha nublado momentáneamente.' });
+    }
+});
+
+// =========================================================
+// INICIAR SERVIDOR
+// =========================================================
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`El Oráculo escucha en el puerto ${PORT}`));
