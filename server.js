@@ -167,36 +167,51 @@ const result = await model.generateContent(prompt);
     }
 });
 
-// Endpoint para salvar el registro en el HISTORIAL
+// Endpoint para salvar el registro en el HISTORIAL (Con Fecha y Hora)
 app.post('/api/quiz-completar', async (req, res) => {
     try {
-        const tzOffset = (new Date()).getTimezoneOffset() * 60000;
-        const localISODate = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+        const ahora = new Date();
+        
+        // 1. Obtener la fecha de hoy local (Formato: YYYY-MM-DD)
+        const tzOffset = ahora.getTimezoneOffset() * 60000;
+        const localISODate = (new Date(ahora - tzOffset)).toISOString().slice(0, 10);
+
+        // 2. Obtener la hora local formateada (Ejemplo: "14:23:45" o "02:23 PM")
+        // Puedes usar 'es-MX' para asegurar el formato de México
+        const horaLocal = ahora.toLocaleTimeString('es-MX', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true // Si prefieres formato de 12 horas con AM/PM (ej. "11:32 PM")
+        });
+
         const { categoria, pregunta, respuesta } = req.body;
 
-        // Armamos el objeto con el registro completo del día
+        // Armamos el objeto con el registro completo del día incluyendo la hora
         const nuevoRegistro = {
             fecha: localISODate,
+            hora: horaLocal, // <-- NUEVO CAMPO
             categoria: categoria,
             pregunta: pregunta,
             respuesta: respuesta
         };
 
         const data = await Progress.findOneAndUpdate(
-            { userId: 'montse_0710' },
+            { userId: req.query.user || 'montse_0710' }, // Mantenemos el usuario dinámico si lo usas
             { 
-                $set: { "dailyQuiz.lastPlayed": localISODate }, // Actualiza la fecha de bloqueo
-                $inc: { "dailyQuiz.currentStreak": 1 },         // Sube la racha
-                $push: { "dailyQuiz.historial": nuevoRegistro } // <-- Empuja el registro a la lista
+                $set: { "dailyQuiz.lastPlayed": localISODate }, 
+                $inc: { "dailyQuiz.currentStreak": 1 },         
+                $push: { "dailyQuiz.historial": nuevoRegistro } 
             }, 
-            { returnDocument: 'after', upsert: true }
+            { returnDocument: 'after', upsert: true } // Manteniendo tu consola limpia de warnings
         );
         res.json({ success: true, racha: data.dailyQuiz.currentStreak });
     } catch (error) {
-        console.error("Error guardando el historial:", error);
+        console.error("Error guardando el historial con hora:", error);
         res.status(500).json({ error: 'Error al salvar respuesta del quiz' });
     }
 });
+
 
 // =========================================================
 // INICIAR SERVIDOR
