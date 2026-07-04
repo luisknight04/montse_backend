@@ -72,7 +72,7 @@ app.post('/api/sync', async (req, res) => {
         const data = await Progress.findOneAndUpdate(
             { userId: 'montse_0710' },
             { openedWeeks, wonPrizes },
-            { new: true, upsert: true }
+            { returnDocument: 'after', upsert: true }
         );
         res.json({ success: true, data });
     } catch (error) {
@@ -88,7 +88,7 @@ app.post('/api/visita', async (req, res) => {
         const data = await Progress.findOneAndUpdate(
             { userId: 'montse_0710' },
             { $inc: { loginCount: 1 } }, 
-            { new: true, upsert: true }
+            { returnDocument: 'after', upsert: true }
         );
         res.json({ success: true, totalVisitas: data.loginCount });
     } catch (error) {
@@ -145,7 +145,24 @@ app.get('/api/quiz-diario', async (req, res) => {
         Reglas estrictas: Las opciones deben ser divertidas, ocurrentes o provocativas. No uses nombres propios (usa Mi Amor, Corazón, Mi Vida). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
 
         const result = await model.generateContent(prompt);
-        const dataQuiz = JSON.parse(result.response.text());
+let respuestaTexto = result.response.text().trim();
+
+// Limpieza de emergencia por si Gemini mete bloques de código Markdown
+if (respuestaTexto.startsWith("```json")) {
+    respuestaTexto = respuestaTexto.replace(/^```json/, "").replace(/```$/, "").trim();
+} else if (respuestaTexto.startsWith("```")) {
+    respuestaTexto = respuestaTexto.replace(/^```/, "").replace(/```$/, "").trim();
+}
+
+// Si metió texto conversacional antes del JSON, buscamos dónde abre realmente el objeto
+const inicioJSON = respuestaTexto.indexOf('{');
+const finJSON = respuestaTexto.lastIndexOf('}');
+
+if (inicioJSON !== -1 && finJSON !== -1) {
+    respuestaTexto = respuestaTexto.substring(inicioJSON, finJSON + 1);
+}
+
+const dataQuiz = JSON.parse(respuestaTexto); // Ahora sí se parsea de forma segura
 
         res.json({ alreadyPlayed: false, ...dataQuiz });
 
@@ -177,7 +194,7 @@ app.post('/api/quiz-completar', async (req, res) => {
                 $inc: { "dailyQuiz.currentStreak": 1 },         // Sube la racha
                 $push: { "dailyQuiz.historial": nuevoRegistro } // <-- Empuja el registro a la lista
             }, 
-            { new: true, upsert: true }
+            { returnDocument: 'after', upsert: true }
         );
         res.json({ success: true, racha: data.dailyQuiz.currentStreak });
     } catch (error) {
