@@ -22,7 +22,7 @@ const progressSchema = new mongoose.Schema({
     dailyQuiz: {                              // <-- NUEVO: Control del Quiz Diario
         lastPlayed: { type: String, default: "" },
         currentStreak: { type: Number, default: 0 },
-        categoriaHoy: { type: String, default: "" }
+        historial: { type: Array, default: [] } // <-- NUEVO: Aquí se guardarán todos los quizzes
     }
 });
 const Progress = mongoose.model('Progress', progressSchema);
