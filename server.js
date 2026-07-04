@@ -161,6 +161,30 @@ app.get('/api/quiz-diario', async (req, res) => {
     }
 });
 
+// Endpoint para salvar que el quiz de hoy ya fue respondido
+app.post('/api/quiz-completar', async (req, res) => {
+    try {
+        const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+        const localISODate = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+        const { categoria } = req.body;
+
+        const data = await Progress.findOneAndUpdate(
+            { userId: 'montse_0710' },
+            { 
+                $set: { 
+                    "dailyQuiz.lastPlayed": localISODate,
+                    "dailyQuiz.categoriaHoy": categoria
+                },
+                $inc: { "dailyQuiz.currentStreak": 1 } // Suma 1 a su racha de días jugando
+            }, 
+            { new: true, upsert: true }
+        );
+        res.json({ success: true, racha: data.dailyQuiz.currentStreak });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al salvar respuesta del quiz' });
+    }
+});
+
 // =========================================================
 // INICIAR SERVIDOR
 // =========================================================
