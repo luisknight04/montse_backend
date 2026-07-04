@@ -126,8 +126,8 @@ app.get('/api/quiz-diario', async (req, res) => {
         const categoriaDelDia = categorias[indiceAleatorio];
 
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
-            generationConfig: { maxOutputTokens: 200, temperature: 0.85, responseMimeType: "application/json" }
+            model: "gemini-3.1-flash-lite",
+            generationConfig: { temperature: 0.85, responseMimeType: "application/json" }
         });
 
         const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven. 
