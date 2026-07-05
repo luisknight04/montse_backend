@@ -114,6 +114,7 @@ app.get('/api/quiz-diario', async (req, res) => {
 
             return res.json({
                 alreadyPlayed: true,
+                currentStreak: userProgress.dailyQuiz?.currentStreak || 0, // <-- AGREGA ESTO
                 categoria: registroDeHoy.categoria || "Complicidad",
                 pregunta: registroDeHoy.pregunta || "¡Ya respondiste el dilema de hoy!",
                 respuestaElegida: registroDeHoy.respuesta || ""
