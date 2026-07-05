@@ -160,7 +160,9 @@ const result = await model.generateContent(prompt);
         // jsonMatch[0] contiene estrictamente el objeto JSON limpio sin texto conversacional ni "Here is the..."
         const dataQuiz = JSON.parse(jsonMatch[0]);
 
-        res.json({ alreadyPlayed: false, ...dataQuiz });
+        res.json({ alreadyPlayed: false,
+                  currentStreak: userProgress.dailyQuiz?.currentStreak || 0,
+                  ...dataQuiz });
 
     } catch (error) {
         console.error("Error al generar el Quiz del día:", error);
