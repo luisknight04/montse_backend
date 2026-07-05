@@ -167,48 +167,65 @@ const result = await model.generateContent(prompt);
     }
 });
 
-// Endpoint para salvar el registro en el HISTORIAL (Con Fecha y Hora)
+// Endpoint para salvar el quiz, aumentar racha y verificar hitos de recompensa
 app.post('/api/quiz-completar', async (req, res) => {
     try {
         const ahora = new Date();
-        
-        // 1. Obtener la fecha de hoy local (Formato: YYYY-MM-DD)
         const tzOffset = ahora.getTimezoneOffset() * 60000;
         const localISODate = (new Date(ahora - tzOffset)).toISOString().slice(0, 10);
-
-        // 2. Obtener la hora local formateada (Ejemplo: "14:23:45" o "02:23 PM")
-        // Puedes usar 'es-MX' para asegurar el formato de México
+        
         const horaLocal = ahora.toLocaleTimeString('es-MX', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: true // Si prefieres formato de 12 horas con AM/PM (ej. "11:32 PM")
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
         });
 
         const { categoria, pregunta, respuesta } = req.body;
+        const usuario = req.query.user || 'montse_0710';
 
-        // Armamos el objeto con el registro completo del día incluyendo la hora
-        const nuevoRegistro = {
-            fecha: localISODate,
-            hora: horaLocal, // <-- NUEVO CAMPO
-            categoria: categoria,
-            pregunta: pregunta,
-            respuesta: respuesta
+        // 1. Primero buscamos el progreso actual para saber qué racha lleva
+        let progress = await Progress.findOne({ userId: usuario });
+        if (!progress) progress = await Progress.create({ userId: usuario });
+
+        const nuevaRacha = (progress.dailyQuiz?.currentStreak || 0) + 1;
+        let premioDesbloqueado = null;
+        let updateFields = {
+            "dailyQuiz.lastPlayed": localISODate,
+            "dailyQuiz.currentStreak": nuevaRacha
         };
 
+        // 2. SISTEMA DE HITOS: Si alcanza rachas perfectas, le regalamos un cupón secreto
+        if (nuevaRacha === 6) {
+            premioDesbloqueado = "🎟️ Cupón de Racha: Un tierno beso de 10 segundos donde tú elijas.";
+            updateFields["wonPrizes.racha_6"] = premioDesbloqueado;
+        } else if (nuevaRacha === 15) {
+            premioDesbloqueado = "🍿 Cupón de Racha: Una tarde de películas donde yo invito todos los snacks que quieras.";
+            updateFields["wonPrizes.racha_15"] = premioDesbloqueado;
+        } else if (nuevaRacha === 25) {
+            premioDesbloqueado = "🔥 Cupón de Racha: Ojos bendados, manos atadas, música suave, velas y mis labios recorriendo tu piel.";
+            updateFields["wonPrizes.racha_25"] = premioDesbloqueado;
+        } else if (nuevaRacha === 40) {
+            premioDesbloqueado = "✨ Cupón de Racha Suprema: Pase para una cita romántica preparada por mí.";
+            updateFields["wonPrizes.racha_40"] = premioDesbloqueado;
+        }
+
+        // 3. Ejecutamos la actualización completa en MongoDB
         const data = await Progress.findOneAndUpdate(
-            { userId: req.query.user || 'montse_0710' }, // Mantenemos el usuario dinámico si lo usas
+            { userId: usuario },
             { 
-                $set: { "dailyQuiz.lastPlayed": localISODate }, 
-                $inc: { "dailyQuiz.currentStreak": 1 },         
-                $push: { "dailyQuiz.historial": nuevoRegistro } 
+                $set: updateFields,
+                $push: { "dailyQuiz.historial": { fecha: localISODate, hora: horaLocal, categoria, pregunta, respuesta } }
             }, 
-            { returnDocument: 'after', upsert: true } // Manteniendo tu consola limpia de warnings
+            { returnDocument: 'after', upsert: true }
         );
-        res.json({ success: true, racha: data.dailyQuiz.currentStreak });
+
+        res.json({ 
+            success: true, 
+            racha: nuevaRacha,
+            premioDesbloqueado: premioDesbloqueado // Le avisamos al frontend si ganó algo
+        });
+
     } catch (error) {
-        console.error("Error guardando el historial con hora:", error);
-        res.status(500).json({ error: 'Error al salvar respuesta del quiz' });
+        console.error("Error en quiz-completar:", error);
+        res.status(500).json({ error: 'Error al procesar el quiz.' });
     }
 });
 
