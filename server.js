@@ -107,14 +107,14 @@ app.get('/api/quiz-diario', async (req, res) => {
         let userProgress = await Progress.findOne({ userId: 'montse_0710' });
         if (!userProgress) userProgress = await Progress.create({ userId: 'montse_0710' });
 
-        // SI YA JUGÓ HOY: Le regresamos la última entrada guardada en su historial
+        // SI YA JUGÓ HOY: Le regresamos la última entrada guardada Y LA RACHA
         if (userProgress.dailyQuiz && userProgress.dailyQuiz.lastPlayed === localISODate) {
             const historial = userProgress.dailyQuiz.historial || [];
             const registroDeHoy = historial.length > 0 ? historial[historial.length - 1] : {};
 
             return res.json({
                 alreadyPlayed: true,
-                currentStreak: userProgress.dailyQuiz?.currentStreak || 0, // <-- AGREGA ESTO
+                currentStreak: userProgress.dailyQuiz.currentStreak || 0, // <-- AHORA SÍ LO MANDAMOS
                 categoria: registroDeHoy.categoria || "Complicidad",
                 pregunta: registroDeHoy.pregunta || "¡Ya respondiste el dilema de hoy!",
                 respuestaElegida: registroDeHoy.respuesta || ""
