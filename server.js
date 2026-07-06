@@ -131,10 +131,8 @@ app.get('/api/quiz-diario', async (req, res) => {
             generationConfig: { temperature: 0.85, responseMimeType: "application/json" }
         });
 
-        const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven. 
-        Evita sonar trágico, excesivamente poético o antiguo. Queremos frescura, juego y misterio moderno.
-        Genera una pregunta de opción múltiple dirigida a mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
-        La pregunta debe plantear un escenario hipotético, ingenioso o coqueto sobre nuestra relación.
+        const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven. 
+        Genera una pregunta de opción múltiple dirigida a mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
         
         Debes devolver un objeto JSON con la siguiente estructura exacta:
         {
