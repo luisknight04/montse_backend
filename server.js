@@ -179,21 +179,46 @@ app.post('/api/quiz-completar', async (req, res) => {
             hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
         });
 
-        const { categoria, pregunta, respuesta } = req.body;
-        const usuario = req.query.user || 'montse_0710';
+         const { categoria, pregunta, respuesta } = req.body;
 
-        // 1. Primero buscamos el progreso actual para saber qué racha lleva
-        let progress = await Progress.findOne({ userId: usuario });
-        if (!progress) progress = await Progress.create({ userId: usuario });
+        // 1. Buscamos el progreso actual
+        let progress = await Progress.findOne({ userId: 'montse_0710' });
+        if (!progress) progress = await Progress.create({ userId: 'montse_0710' });
 
-        const nuevaRacha = (progress.dailyQuiz?.currentStreak || 0) + 1;
+        // 2. LÓGICA DE CONTROL DE RACHA (STREAK SYSTEM)
+        let nuevaRacha = 1; // Si es su primer juego o rompió la racha, vuelve a 1
+        const lastPlayedStr = progress.dailyQuiz?.lastPlayed;
+
+        if (lastPlayedStr) {
+            // Forzamos la hora a medianoche (T00:00:00) para evitar desfases de zona horaria
+            const fechaUltimoJuego = new Date(lastPlayedStr + "T00:00:00");
+            const fechaHoy = new Date(localISODate + "T00:00:00");
+            
+            // Calculamos la diferencia exacta en días
+            const diferenciaMilisegundos = fechaHoy - fechaUltimoJuego;
+            const diferenciaDias = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
+
+            if (diferenciaDias === 1) {
+                // ¡Jugó ayer! Mantuvo la sintonía, sumamos 1 a la racha
+                nuevaRacha = (progress.dailyQuiz.currentStreak || 0) + 1;
+            } else if (diferenciaDias > 1) {
+                // Dejó pasar más de un día. La racha se rompe y regresa a 1.
+                nuevaRacha = 1;
+            } else if (diferenciaDias === 0) {
+                // Caso de seguridad: Jugó el mismo día (la racha no cambia)
+                nuevaRacha = progress.dailyQuiz.currentStreak || 1;
+            }
+        }
+
         let premioDesbloqueado = null;
+        
+        // Construimos el objeto de actualización usando nuestra nueva variable matemática
         let updateFields = {
             "dailyQuiz.lastPlayed": localISODate,
             "dailyQuiz.currentStreak": nuevaRacha
         };
 
-        // 2. SISTEMA DE HITOS: Si alcanza rachas perfectas, le regalamos un cupón secreto
+        // 3. SISTEMA DE HITOS: Si alcanza rachas perfectas, le regalamos un cupón secreto
         if (nuevaRacha === 6) {
             premioDesbloqueado = "🎟️ Cupón de Racha: Un tierno beso de 10 segundos donde tú elijas.";
             updateFields["wonPrizes.racha_6"] = premioDesbloqueado;
