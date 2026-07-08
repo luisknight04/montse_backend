@@ -156,7 +156,7 @@ app.get('/api/quiz-diario', async (req, res) => {
 
         if(categoriaDelDia == "Erótica / Atrevida"){
             const prompt = `Genera un objeto JSON para la categoría: "${categoriaDelDia}".
-            La pregunta está dirigida a mi novia, puedes tocar los siguientes temas: sexo, sexo oral, lubricante, bdsm, ataduras, fantasías, juguetes sexuales, lugares prohibidos, roleplay, dirty talk, zonas erógenas lcaves, lencería y ropa, juegos, retos, etc.
+            La pregunta está dirigida a mi novia, puedes tocar los siguientes temas: sexo, sexo oral, lubricante, bdsm, ataduras, fantasías, juguetes sexuales, lugares prohibidos, roleplay, dirty talk, zonas erógenas claves, lencería y ropa, juegos, retos, etc.
             Estructura exacta requerida:
             {
              "categoria": "${categoriaDelDia}",
