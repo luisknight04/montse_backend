@@ -152,6 +152,7 @@ app.get('/api/quiz-diario', async (req, res) => {
             }
         });
 
+        categoriaDelDia = "Erótica / Atrevida";
         let prompt = "";
 
         if(categoriaDelDia == "Erótica / Atrevida"){
