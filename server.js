@@ -97,7 +97,7 @@ app.post('/api/visita', async (req, res) => {
 });
 
 // =========================================================
-// 6. API: GENERADOR DEL QUIZ DIARIO DE SINTONÍA (CON HISTORIAL)
+// 6. API: GENERADOR DEL QUIZ DIARIO DE SINTONÍA (FIJO)
 // =========================================================
 app.get('/api/quiz-diario', async (req, res) => {
     try {
@@ -107,63 +107,80 @@ app.get('/api/quiz-diario', async (req, res) => {
         let userProgress = await Progress.findOne({ userId: 'montse_0710' });
         if (!userProgress) userProgress = await Progress.create({ userId: 'montse_0710' });
 
-        // SI YA JUGÓ HOY: Le regresamos la última entrada guardada Y LA RACHA
-        if (userProgress.dailyQuiz && userProgress.dailyQuiz.lastPlayed === localISODate) {
+        // 1. CÁLCULO VISUAL DE LA RACHA ACTUAL
+        let rachaActiva = userProgress.dailyQuiz?.currentStreak || 0;
+        const lastPlayedStr = userProgress.dailyQuiz?.lastPlayed;
+
+        if (lastPlayedStr) {
+            const fechaUltimoJuego = new Date(lastPlayedStr + "T00:00:00");
+            const fechaHoy = new Date(localISODate + "T00:00:00");
+            const diferenciaDias = (fechaHoy - fechaUltimoJuego) / (1000 * 60 * 60 * 24);
+
+            // Si han pasado más de 1 día desde la última vez que jugó, visualmente la racha está en 0
+            if (diferenciaDias > 1) {
+                rachaActiva = 0;
+            }
+        }
+
+        // 2. CONTROL DE BLOQUEO: ¿Ya jugó hoy?
+        if (lastPlayedStr === localISODate) {
             const historial = userProgress.dailyQuiz.historial || [];
             const registroDeHoy = historial.length > 0 ? historial[historial.length - 1] : {};
 
             return res.json({
                 alreadyPlayed: true,
-                currentStreak: userProgress.dailyQuiz.currentStreak || 0, // <-- AHORA SÍ LO MANDAMOS
+                currentStreak: rachaActiva, // Usamos la racha calculada
                 categoria: registroDeHoy.categoria || "Complicidad",
                 pregunta: registroDeHoy.pregunta || "¡Ya respondiste el dilema de hoy!",
                 respuestaElegida: registroDeHoy.respuesta || ""
             });
         }
 
-        // SI ES DÍA NUEVO: Generamos la pregunta con IA
+        // 3. SI ES DÍA NUEVO: Generamos la pregunta con IA
         const categorias = ["Romántica", "Divertida / Cómplice", "Erótica / Atrevida"];
         const indiceAleatorio = Math.floor(Math.random() * categorias.length);
         const categoriaDelDia = categorias[indiceAleatorio];
 
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-3.1-flash-lite",
-            generationConfig: { temperature: 0.85, responseMimeType: "application/json" }
+            model: "gemini-1.5-flash", // Asegúrate de tener el modelo correcto aquí
+            systemInstruction: "Actúas estrictamente como una API que genera desafíos de sintonía para parejas en formato JSON. Tu tono interno debe reflejar un narrador cómplice, audaz, sumamente ingenioso y con picardía, ideal para una pareja joven. No hables, no saludes, no uses Markdown. Tu salida debe ser única y exclusivamente el objeto JSON.",
+            generationConfig: { 
+                maxOutputTokens: 250, 
+                temperature: 0.85,
+                responseMimeType: "application/json" 
+            }
         });
 
-        const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven. 
-        Genera una pregunta de opción múltiple dirigida a mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
+        const prompt = `Genera un objeto JSON para la categoría: "${categoriaDelDia}".
+        La pregunta debe plantear un escenario hipotético, ingenioso o coqueto sobre una relación, con opciones divertidas, ocurrentes o provocativas.
         
-        Debes devolver un objeto JSON con la siguiente estructura exacta:
+        Estructura exacta requerida:
         {
           "categoria": "${categoriaDelDia}",
           "pregunta": "Texto de la pregunta aquí",
           "opciones": ["Opción A", "Opción B", "Opción C"]
         }
         
-        Reglas estrictas: Las opciones deben ser divertidas, ocurrentes o provocativas. No uses nombres propios (usa Mi Amor, Corazón, Mi Vida). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
+        Reglas: No uses nombres propios (usa Mi Amor, Corazón o Mi Vida). Máximo 3 opciones.`;
 
-const result = await model.generateContent(prompt);
+        const result = await model.generateContent(prompt);
         const respuestaTexto = result.response.text().trim();
 
-        // EXTRACCIÓN INFALIBLE CON REGEX:
-        // Busca todo lo que esté atrapado entre las llaves { ... } incluyendo saltos de línea
         const jsonMatch = respuestaTexto.match(/\{[\s\S]*\}/);
-
         if (!jsonMatch) {
-            console.error("Texto crudo recibido de Gemini:", respuestaTexto);
-            throw new SyntaxError("No se encontró una estructura JSON válida en la respuesta de la IA.");
+            throw new SyntaxError("No se encontró estructura JSON válida.");
         }
 
-        // jsonMatch[0] contiene estrictamente el objeto JSON limpio sin texto conversacional ni "Here is the..."
-        const dataQuiz = JSON.parse(jsonMatch[0]);
+        const dataQuiz = JSON.parse(jsonMatch[0]); 
 
-        res.json({ alreadyPlayed: false,
-                  currentStreak: userProgress.dailyQuiz?.currentStreak || 0,
-                  ...dataQuiz });
+        res.json({
+            alreadyPlayed: false,
+            currentStreak: rachaActiva, // Usamos la racha calculada antes de que juegue
+            ...dataQuiz
+        });
 
     } catch (error) {
-        console.error("Error al generar el Quiz del día:", error);
+        console.error("Error al generar el Quiz:", error);
         res.status(500).json({ error: 'El destino se ha nublado momentáneamente.' });
     }
 });
