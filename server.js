@@ -152,9 +152,21 @@ app.get('/api/quiz-diario', async (req, res) => {
             }
         });
 
-        // PROMPT LIMPIO
+
+        if(categoriaDelDia == "Erótica / Atrevida"){
+            const prompt = `Genera un objeto JSON para la categoría: "${categoriaDelDia}".
+            La pregunta está dirigida a mi novia, puedes tocar los siguientes temas: sexo, sexo oral, lubricante, bdsm, ataduras, fantasías, juguetes sexuales, lugares prohibidos, roleplay, dirty talk, zonas erógenas lcaves, lencería y ropa, juegos, retos, etc.
+            Estructura exacta requerida:
+            {
+             "categoria": "${categoriaDelDia}",
+             "pregunta": "Texto de la pregunta aquí",
+             "opciones": ["Opción A", "Opción B", "Opción C", "Opción D"]
+            }
+            Reglas estrictas: No uses nombres propios (usa Mi Amor, Mi Vida, Corazón). Máximo 4 opciones. No agregues texto fuera del objeto JSON.`;
+        }
+        else{
         const prompt = `Genera un objeto JSON para la categoría: "${categoriaDelDia}".
-        La pregunta debe plantear un escenario hipotético, ingenioso o coqueto sobre una relación, con opciones divertidas, ocurrentes o provocativas.
+        La pregunta está dirigida a mi novia.
         Estructura exacta requerida:
         {
           "categoria": "${categoriaDelDia}",
@@ -162,6 +174,7 @@ app.get('/api/quiz-diario', async (req, res) => {
           "opciones": ["Opción A", "Opción B", "Opción C", "Opción D"]
         }
         Reglas estrictas: No uses nombres propios (usa Mi Amor, Mi Vida, Corazón). Máximo 4 opciones. No agregues texto fuera del objeto JSON.`;
+        }
 
         const result = await model.generateContent(prompt);
         const respuestaTexto = result.response.text().trim();
