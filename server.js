@@ -144,7 +144,8 @@ app.get('/api/quiz-diario', async (req, res) => {
         const categoriaDelDia = categorias[indiceAleatorio];
 
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-3.1-flash-lite", // Usando tu optimización del modelo lite generationConfig: { 
+            model: "gemini-3.1-flash-lite", // Usando tu optimización del modelo lite 
+            generationConfig: { 
                 temperature: 0.85,
                 responseMimeType: "application/json" 
             }
