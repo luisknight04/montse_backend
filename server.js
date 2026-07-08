@@ -97,7 +97,7 @@ app.post('/api/visita', async (req, res) => {
 });
 
 // =========================================================
-// 6. API: GENERADOR DEL QUIZ DIARIO DE SINTONÍA (FIJO)
+// 6. API: GENERADOR DEL QUIZ DIARIO DE SINTONÍA (CORREGIDO)
 // =========================================================
 app.get('/api/quiz-diario', async (req, res) => {
     try {
@@ -107,16 +107,18 @@ app.get('/api/quiz-diario', async (req, res) => {
         let userProgress = await Progress.findOne({ userId: 'montse_0710' });
         if (!userProgress) userProgress = await Progress.create({ userId: 'montse_0710' });
 
-        // 1. CÁLCULO VISUAL DE LA RACHA ACTUAL
+        // 1. CÁLCULO VISUAL DE LA RACHA ACTUAL (CON REDONDEO SEGURO)
         let rachaActiva = userProgress.dailyQuiz?.currentStreak || 0;
         const lastPlayedStr = userProgress.dailyQuiz?.lastPlayed;
 
         if (lastPlayedStr) {
             const fechaUltimoJuego = new Date(lastPlayedStr + "T00:00:00");
             const fechaHoy = new Date(localISODate + "T00:00:00");
-            const diferenciaDias = (fechaHoy - fechaUltimoJuego) / (1000 * 60 * 60 * 24);
+            
+            // Forzamos un entero absoluto usando Math.floor para evitar decimales por zonas horarias
+            const diferenciaDias = Math.floor((fechaHoy - fechaUltimoJuego) / (1000 * 60 * 60 * 24));
 
-            // Si han pasado más de 1 día desde la última vez que jugó, visualmente la racha está en 0
+            // Si ha pasado más de 1 día completo (ej. del 4 de julio al 7 de julio son 3 días), la racha expira a 0
             if (diferenciaDias > 1) {
                 rachaActiva = 0;
             }
@@ -129,7 +131,7 @@ app.get('/api/quiz-diario', async (req, res) => {
 
             return res.json({
                 alreadyPlayed: true,
-                currentStreak: rachaActiva, // Usamos la racha calculada
+                currentStreak: rachaActiva, 
                 categoria: registroDeHoy.categoria || "Complicidad",
                 pregunta: registroDeHoy.pregunta || "¡Ya respondiste el dilema de hoy!",
                 respuestaElegida: registroDeHoy.respuesta || ""
@@ -142,17 +144,15 @@ app.get('/api/quiz-diario', async (req, res) => {
         const categoriaDelDia = categorias[indiceAleatorio];
 
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-3.1-flash-lite", // Asegúrate de tener el modelo correcto aquí
-            generationConfig: {  
+            model: "gemini-3.1-flash-lite", // Usando tu optimización del modelo lite generationConfig: { 
                 temperature: 0.85,
                 responseMimeType: "application/json" 
             }
         });
 
-        const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven. 
-
-        Genera una pregunta de opción múltiple dirigida a mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
-
+        const prompt = `Actúa como el narrador confidente e intelectual de una novela gótica y pasional.
+        Genera una pregunta de opción múltiple para mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
+        La pregunta debe plantear un escenario hipotético, coqueto o cómplice sobre nuestra relación.
         
         Debes devolver un objeto JSON con la siguiente estructura exacta:
         {
@@ -161,8 +161,7 @@ app.get('/api/quiz-diario', async (req, res) => {
           "opciones": ["Opción A", "Opción B", "Opción C"]
         }
         
-        Reglas estrictas: Las opciones deben ser divertidas, ocurrentes o provocativas. No uses nombres propios (usa Mi Amor, Corazón, Mi Vida). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
-
+        Reglas estrictas: No uses nombres propios (usa Mi Amor, Mi Vida, Corazón). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
 
         const result = await model.generateContent(prompt);
         const respuestaTexto = result.response.text().trim();
@@ -176,7 +175,7 @@ app.get('/api/quiz-diario', async (req, res) => {
 
         res.json({
             alreadyPlayed: false,
-            currentStreak: rachaActiva, // Usamos la racha calculada antes de que juegue
+            currentStreak: rachaActiva, 
             ...dataQuiz
         });
 
@@ -197,46 +196,39 @@ app.post('/api/quiz-completar', async (req, res) => {
             hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
         });
 
-         const { categoria, pregunta, respuesta } = req.body;
+        const { categoria, pregunta, respuesta } = req.body;
 
         // 1. Buscamos el progreso actual
         let progress = await Progress.findOne({ userId: 'montse_0710' });
         if (!progress) progress = await Progress.create({ userId: 'montse_0710' });
 
-        // 2. LÓGICA DE CONTROL DE RACHA (STREAK SYSTEM)
-        let nuevaRacha = 1; // Si es su primer juego o rompió la racha, vuelve a 1
+        // 2. LÓGICA DE CONTROL DE RACHA (STREAK SYSTEM CON MATH.FLOOR)
+        let nuevaRacha = 1; 
         const lastPlayedStr = progress.dailyQuiz?.lastPlayed;
 
         if (lastPlayedStr) {
-            // Forzamos la hora a medianoche (T00:00:00) para evitar desfases de zona horaria
             const fechaUltimoJuego = new Date(lastPlayedStr + "T00:00:00");
             const fechaHoy = new Date(localISODate + "T00:00:00");
             
-            // Calculamos la diferencia exacta en días
-            const diferenciaMilisegundos = fechaHoy - fechaUltimoJuego;
-            const diferenciaDias = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
+            const diferenciaDias = Math.floor((fechaHoy - fechaUltimoJuego) / (1000 * 60 * 60 * 24));
 
             if (diferenciaDias === 1) {
-                // ¡Jugó ayer! Mantuvo la sintonía, sumamos 1 a la racha
                 nuevaRacha = (progress.dailyQuiz.currentStreak || 0) + 1;
-            } else if (diferenciaDias > 1) {
-                // Dejó pasar más de un día. La racha se rompe y regresa a 1.
-                nuevaRacha = 1;
             } else if (diferenciaDias === 0) {
-                // Caso de seguridad: Jugó el mismo día (la racha no cambia)
                 nuevaRacha = progress.dailyQuiz.currentStreak || 1;
+            } else {
+                nuevaRacha = 1; // Rompió racha (pasaron más de 2 días)
             }
         }
 
         let premioDesbloqueado = null;
         
-        // Construimos el objeto de actualización usando nuestra nueva variable matemática
         let updateFields = {
             "dailyQuiz.lastPlayed": localISODate,
             "dailyQuiz.currentStreak": nuevaRacha
         };
 
-        // 3. SISTEMA DE HITOS: Si alcanza rachas perfectas, le regalamos un cupón secreto
+        // 3. SISTEMA DE HITOS
         if (nuevaRacha === 6) {
             premioDesbloqueado = "🎟️ Cupón de Racha: Un tierno beso de 10 segundos donde tú elijas.";
             updateFields["wonPrizes.racha_6"] = premioDesbloqueado;
@@ -244,16 +236,16 @@ app.post('/api/quiz-completar', async (req, res) => {
             premioDesbloqueado = "🍿 Cupón de Racha: Una tarde de películas donde yo invito todos los snacks que quieras.";
             updateFields["wonPrizes.racha_15"] = premioDesbloqueado;
         } else if (nuevaRacha === 25) {
-            premioDesbloqueado = "🔥 Cupón de Racha: Ojos bendados, manos atadas, música suave, velas y mis labios recorriendo tu piel.";
+            premioDesbloqueado = "🔥 Cupón de Racha: Ojos vendados, manos atadas, música suave, velas y mis labios recorriendo tu piel.";
             updateFields["wonPrizes.racha_25"] = premioDesbloqueado;
         } else if (nuevaRacha === 40) {
             premioDesbloqueado = "✨ Cupón de Racha Suprema: Pase para una cita romántica preparada por mí.";
             updateFields["wonPrizes.racha_40"] = premioDesbloqueado;
         }
 
-        // 3. Ejecutamos la actualización completa en MongoDB
+        // 4. CORREGIDO: Cambiado 'usuario' por el ID string 'montse_0710' directo
         const data = await Progress.findOneAndUpdate(
-            { userId: usuario },
+            { userId: 'montse_0710' }, 
             { 
                 $set: updateFields,
                 $push: { "dailyQuiz.historial": { fecha: localISODate, hora: horaLocal, categoria, pregunta, respuesta } }
@@ -264,7 +256,7 @@ app.post('/api/quiz-completar', async (req, res) => {
         res.json({ 
             success: true, 
             racha: nuevaRacha,
-            premioDesbloqueado: premioDesbloqueado // Le avisamos al frontend si ganó algo
+            premioDesbloqueado: premioDesbloqueado 
         });
 
     } catch (error) {
