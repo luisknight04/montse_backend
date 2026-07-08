@@ -138,9 +138,16 @@ app.get('/api/quiz-diario', async (req, res) => {
             });
         }
 
-        const categorias = ["Romántica", "Divertida / Cómplice", "Erótica / Atrevida"];
-        const indiceAleatorio = Math.floor(Math.random() * categorias.length);
-        const categoriaDelDia = categorias[indiceAleatorio];
+const categorias = ["Romántica", "Divertida / Cómplice", "Erótica / Atrevida"];
+        let categoriaDelDia = "";
+
+        // Si pasas el parámetro ?testCategory= en la URL, la forzamos; si no, queda al azar
+        if (req.query.testCategory && categorias.includes(req.query.testCategory)) {
+            categoriaDelDia = req.query.testCategory;
+        } else {
+            const indiceAleatorio = Math.floor(Math.random() * categorias.length);
+            categoriaDelDia = categorias[indiceAleatorio];
+        }
 
         // RECUPERAMOS EL SYSTEM INSTRUCTION PARA EVITAR CRASHES DEL JSON
         const model = genAI.getGenerativeModel({ 
@@ -151,8 +158,6 @@ app.get('/api/quiz-diario', async (req, res) => {
                 responseMimeType: "application/json" 
             }
         });
-
-        categoriaDelDia = "Erótica / Atrevida";
         let prompt = "";
 
         if(categoriaDelDia == "Erótica / Atrevida"){
