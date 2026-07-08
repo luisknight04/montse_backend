@@ -142,26 +142,27 @@ app.get('/api/quiz-diario', async (req, res) => {
         const categoriaDelDia = categorias[indiceAleatorio];
 
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash", // Asegúrate de tener el modelo correcto aquí
-            systemInstruction: "Actúas estrictamente como una API que genera desafíos de sintonía para parejas en formato JSON. Tu tono interno debe reflejar un narrador cómplice, audaz, sumamente ingenioso y con picardía, ideal para una pareja joven. No hables, no saludes, no uses Markdown. Tu salida debe ser única y exclusivamente el objeto JSON.",
-            generationConfig: { 
-                maxOutputTokens: 250, 
+            model: "gemini-3.1-flash-lite", // Asegúrate de tener el modelo correcto aquí
+            generationConfig: {  
                 temperature: 0.85,
                 responseMimeType: "application/json" 
             }
         });
 
-        const prompt = `Genera un objeto JSON para la categoría: "${categoriaDelDia}".
-        La pregunta debe plantear un escenario hipotético, ingenioso o coqueto sobre una relación, con opciones divertidas, ocurrentes o provocativas.
+        const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven. 
+
+        Genera una pregunta de opción múltiple dirigida a mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
+
         
-        Estructura exacta requerida:
+        Debes devolver un objeto JSON con la siguiente estructura exacta:
         {
           "categoria": "${categoriaDelDia}",
           "pregunta": "Texto de la pregunta aquí",
           "opciones": ["Opción A", "Opción B", "Opción C"]
         }
         
-        Reglas: No uses nombres propios (usa Mi Amor, Corazón o Mi Vida). Máximo 3 opciones.`;
+        Reglas estrictas: Las opciones deben ser divertidas, ocurrentes o provocativas. No uses nombres propios (usa Mi Amor, Corazón, Mi Vida). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
+
 
         const result = await model.generateContent(prompt);
         const respuestaTexto = result.response.text().trim();
