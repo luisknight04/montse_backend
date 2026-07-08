@@ -151,18 +151,16 @@ app.get('/api/quiz-diario', async (req, res) => {
             }
         });
 
-        const prompt = `Actúa como el narrador confidente e intelectual de una novela gótica y pasional.
-        Genera una pregunta de opción múltiple para mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
-        La pregunta debe plantear un escenario hipotético, coqueto o cómplice sobre nuestra relación.
-        
-        Debes devolver un objeto JSON con la siguiente estructura exacta:
+        const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven.
+        Genera una pregunta de opción múltiple dirigida a mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
+        Devuelve un objeto JSON con esta estructura exacta:
         {
           "categoria": "${categoriaDelDia}",
           "pregunta": "Texto de la pregunta aquí",
-          "opciones": ["Opción A", "Opción B", "Opción C"]
+          "opciones": ["Opción A", "Opción B", "Opción C", "Opción D"]
         }
         
-        Reglas estrictas: No uses nombres propios (usa Mi Amor, Mi Vida, Corazón). Máximo 3 opciones. No agregues texto fuera del objeto JSON.`;
+        Reglas estrictas: No uses nombres propios (usa Mi Amor, Mi Vida, Corazón). Máximo 4 opciones. No agregues texto fuera del objeto JSON.`;
 
         const result = await model.generateContent(prompt);
         const respuestaTexto = result.response.text().trim();
