@@ -152,6 +152,7 @@ app.get('/api/quiz-diario', async (req, res) => {
             }
         });
 
+        let prompt = "";
 
         if(categoriaDelDia == "Erótica / Atrevida"){
             const prompt = `Genera un objeto JSON para la categoría: "${categoriaDelDia}".
