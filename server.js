@@ -97,17 +97,20 @@ app.post('/api/visita', async (req, res) => {
 });
 
 // =========================================================
-// 6. API: GENERADOR DEL QUIZ DIARIO DE SINTONÍA (CORREGIDO)
+// 6. API: GENERADOR DEL QUIZ DIARIO DE SINTONÍA
 // =========================================================
 app.get('/api/quiz-diario', async (req, res) => {
     try {
-        const tzOffset = (new Date()).getTimezoneOffset() * 60000;
-        const localISODate = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+        // HACK DE ZONA HORARIA: Forzamos la fecha exacta de México central (Puebla)
+        const formatter = new Intl.DateTimeFormat('en-CA', { 
+            timeZone: 'America/Mexico_City', 
+            year: 'numeric', month: '2-digit', day: '2-digit' 
+        });
+        const localISODate = formatter.format(new Date()); // Resultado infalible: "YYYY-MM-DD"
 
         let userProgress = await Progress.findOne({ userId: 'montse_0710' });
         if (!userProgress) userProgress = await Progress.create({ userId: 'montse_0710' });
 
-        // 1. CÁLCULO VISUAL DE LA RACHA ACTUAL (CON REDONDEO SEGURO)
         let rachaActiva = userProgress.dailyQuiz?.currentStreak || 0;
         const lastPlayedStr = userProgress.dailyQuiz?.lastPlayed;
 
@@ -115,16 +118,13 @@ app.get('/api/quiz-diario', async (req, res) => {
             const fechaUltimoJuego = new Date(lastPlayedStr + "T00:00:00");
             const fechaHoy = new Date(localISODate + "T00:00:00");
             
-            // Forzamos un entero absoluto usando Math.floor para evitar decimales por zonas horarias
             const diferenciaDias = Math.floor((fechaHoy - fechaUltimoJuego) / (1000 * 60 * 60 * 24));
 
-            // Si ha pasado más de 1 día completo (ej. del 4 de julio al 7 de julio son 3 días), la racha expira a 0
             if (diferenciaDias > 1) {
                 rachaActiva = 0;
             }
         }
 
-        // 2. CONTROL DE BLOQUEO: ¿Ya jugó hoy?
         if (lastPlayedStr === localISODate) {
             const historial = userProgress.dailyQuiz.historial || [];
             const registroDeHoy = historial.length > 0 ? historial[historial.length - 1] : {};
@@ -138,28 +138,29 @@ app.get('/api/quiz-diario', async (req, res) => {
             });
         }
 
-        // 3. SI ES DÍA NUEVO: Generamos la pregunta con IA
         const categorias = ["Romántica", "Divertida / Cómplice", "Erótica / Atrevida"];
         const indiceAleatorio = Math.floor(Math.random() * categorias.length);
         const categoriaDelDia = categorias[indiceAleatorio];
 
+        // RECUPERAMOS EL SYSTEM INSTRUCTION PARA EVITAR CRASHES DEL JSON
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-3.1-flash-lite", // Usando tu optimización del modelo lite 
+            model: "gemini-3.1-flash-lite", 
+            systemInstruction: "Actúas estrictamente como una API que genera desafíos de sintonía para parejas en formato JSON. Tu tono interno debe reflejar un narrador cómplice, audaz, sumamente ingenioso y con picardía, ideal para una pareja joven. No hables, no saludes, no uses Markdown. Tu salida debe ser única y exclusivamente el objeto JSON.",
             generationConfig: { 
                 temperature: 0.85,
                 responseMimeType: "application/json" 
             }
         });
 
-        const prompt = `Actúa como un narrador cómplice, audaz, sumamente ingenioso y con un toque de picardía ideal para una pareja joven.
-        Genera una pregunta de opción múltiple dirigida a mi novia basada estrictamente en la categoría: "${categoriaDelDia}".
-        Devuelve un objeto JSON con esta estructura exacta:
+        // PROMPT LIMPIO
+        const prompt = `Genera un objeto JSON para la categoría: "${categoriaDelDia}".
+        La pregunta debe plantear un escenario hipotético, ingenioso o coqueto sobre una relación, con opciones divertidas, ocurrentes o provocativas.
+        Estructura exacta requerida:
         {
           "categoria": "${categoriaDelDia}",
           "pregunta": "Texto de la pregunta aquí",
           "opciones": ["Opción A", "Opción B", "Opción C", "Opción D"]
         }
-        
         Reglas estrictas: No uses nombres propios (usa Mi Amor, Mi Vida, Corazón). Máximo 4 opciones. No agregues texto fuera del objeto JSON.`;
 
         const result = await model.generateContent(prompt);
@@ -184,24 +185,30 @@ app.get('/api/quiz-diario', async (req, res) => {
     }
 });
 
-// Endpoint para salvar el quiz, aumentar racha y verificar hitos de recompensa
+// =========================================================
+// 7. API: GUARDAR RESPUESTA Y ACTUALIZAR RACHA
+// =========================================================
 app.post('/api/quiz-completar', async (req, res) => {
     try {
         const ahora = new Date();
-        const tzOffset = ahora.getTimezoneOffset() * 60000;
-        const localISODate = (new Date(ahora - tzOffset)).toISOString().slice(0, 10);
+        
+        // HACK DE ZONA HORARIA PARA GUARDAR
+        const formatter = new Intl.DateTimeFormat('en-CA', { 
+            timeZone: 'America/Mexico_City', 
+            year: 'numeric', month: '2-digit', day: '2-digit' 
+        });
+        const localISODate = formatter.format(ahora);
         
         const horaLocal = ahora.toLocaleTimeString('es-MX', {
+            timeZone: 'America/Mexico_City',
             hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
         });
 
         const { categoria, pregunta, respuesta } = req.body;
 
-        // 1. Buscamos el progreso actual
         let progress = await Progress.findOne({ userId: 'montse_0710' });
         if (!progress) progress = await Progress.create({ userId: 'montse_0710' });
 
-        // 2. LÓGICA DE CONTROL DE RACHA (STREAK SYSTEM CON MATH.FLOOR)
         let nuevaRacha = 1; 
         const lastPlayedStr = progress.dailyQuiz?.lastPlayed;
 
@@ -216,18 +223,16 @@ app.post('/api/quiz-completar', async (req, res) => {
             } else if (diferenciaDias === 0) {
                 nuevaRacha = progress.dailyQuiz.currentStreak || 1;
             } else {
-                nuevaRacha = 1; // Rompió racha (pasaron más de 2 días)
+                nuevaRacha = 1; 
             }
         }
 
         let premioDesbloqueado = null;
-        
         let updateFields = {
             "dailyQuiz.lastPlayed": localISODate,
             "dailyQuiz.currentStreak": nuevaRacha
         };
 
-        // 3. SISTEMA DE HITOS
         if (nuevaRacha === 6) {
             premioDesbloqueado = "🎟️ Cupón de Racha: Un tierno beso de 10 segundos donde tú elijas.";
             updateFields["wonPrizes.racha_6"] = premioDesbloqueado;
@@ -242,7 +247,6 @@ app.post('/api/quiz-completar', async (req, res) => {
             updateFields["wonPrizes.racha_40"] = premioDesbloqueado;
         }
 
-        // 4. CORREGIDO: Cambiado 'usuario' por el ID string 'montse_0710' directo
         const data = await Progress.findOneAndUpdate(
             { userId: 'montse_0710' }, 
             { 
@@ -263,11 +267,6 @@ app.post('/api/quiz-completar', async (req, res) => {
         res.status(500).json({ error: 'Error al procesar el quiz.' });
     }
 });
-
-
-// =========================================================
-// INICIAR SERVIDOR
-// =========================================================
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`El Oráculo escucha en el puerto ${PORT}`));
