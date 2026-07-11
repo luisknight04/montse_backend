@@ -162,7 +162,7 @@ const categorias = ["Romántica", "Divertida / Cómplice", "Erótica / Atrevida"
 
         if(categoriaDelDia == "Erótica / Atrevida"){
             prompt = `Genera un objeto JSON para la categoría: "${categoriaDelDia}".
-            La pregunta está dirigida a mi novia, puedes tocar los siguientes temas: sexo, sexo oral, lubricante, bdsm, ataduras, fantasías, juguetes sexuales, lugares prohibidos, roleplay, dirty talk, zonas erógenas claves, lencería y ropa, juegos, retos, etc.
+            La pregunta está dirigida a mi novia, puedes tocar los siguientes temas: sexo, sexo oral, masturbación mutua, fingering, lubricante, bdsm, ataduras, posiciones sexuales, fantasías, juguetes sexuales, mordazas, lugares prohibidos, roleplay, dirty talk, zonas erógenas claves, lencería y ropa, juegos, retos, etc.
             Estructura exacta requerida:
             {
              "categoria": "${categoriaDelDia}",
